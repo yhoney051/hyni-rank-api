@@ -8,14 +8,10 @@ import time
 import logging
 
 app = Flask(__name__)
-
-# ────────────────────────────────
-# 로거: 에러 발생 시 Render 로그에 스택트레이스 출력
-# ────────────────────────────────
 logging.basicConfig(level=logging.INFO)
 
 def get_blog_rank(keyword: str, target_blog: str):
-    """네이버 블로그 탭에서 target_blog가 몇 위에 뜨는지 반환. 못 찾으면 None."""
+    """네이버 블로그 탭에서 target_blog가 몇 위에 노출되는지 반환합니다."""
     options = webdriver.ChromeOptions()
     options.add_argument("--headless")
     options.add_argument("--no-sandbox")
@@ -23,7 +19,7 @@ def get_blog_rank(keyword: str, target_blog: str):
 
     driver = webdriver.Chrome(
         service=Service(ChromeDriverManager().install()),
-        options=options
+        options=options,
     )
 
     try:
@@ -35,21 +31,20 @@ def get_blog_rank(keyword: str, target_blog: str):
         search.send_keys(Keys.RETURN)
         time.sleep(3)
 
-        # 블로그 탭 이동 (탭이 없다면 URL 직접 접근)
+        # 블로그 탭 이동 (없으면 URL 직접 접근)
         try:
             blog_tab = driver.find_element(By.LINK_TEXT, "블로그")
             blog_tab.click()
             time.sleep(3)
         except Exception:
-            driver.get(f"https://search.naver.com/search.naver?where=blog&query={keyword}")
+            driver.get(
+                f"https://search.naver.com/search.naver?where=blog&query={keyword}"
+            )
             time.sleep(3)
 
         names = driver.find_elements(By.CSS_SELECTOR, ".user_info > a.name")
-
-        # ‘더데이의원’ → [‘더데이의원’] / ‘하이-니 클리닉’ → [‘하이’, ‘니’, ‘클리닉’]
         keywords_to_match = [
-            w for w in target_blog.replace("-", " ").replace("'", "").split()
-            if len(w) > 1
+            w for w in target_blog.replace("-", " ").replace("'", "").split() if len(w) > 1
         ]
 
         for idx, elem in enumerate(names, 1):
@@ -59,7 +54,6 @@ def get_blog_rank(keyword: str, target_blog: str):
         return None
 
     except Exception as e:
-        # Render 로그에 전체 스택트레이스 남김
         app.logger.exception("크롤링 중 오류", exc_info=e)
         return None
 
@@ -69,8 +63,13 @@ def get_blog_rank(keyword: str, target_blog: str):
 
 @app.route("/rank", methods=["POST"])
 def rank():
-    # Content‑Type이 달라도 JSON 파싱되게 force=True
+    # 디버그용: 요청 원본과 Content-Type 확인
+    app.logger.info("RAW body >> %s", request.data)
+    app.logger.info("Content-Type >> %s", request.content_type)
+
     data = request.get_json(force=True)
+    if not data:
+        return jsonify({"error": "Invalid JSON"}), 400
 
     keyword = data.get("keyword")
     blog_name = data.get("blog_name")
@@ -83,5 +82,4 @@ def rank():
 
 
 if __name__ == "__main__":
-    # 로컬에서 실행할 때만 디버그 모드
     app.run(debug=True)
