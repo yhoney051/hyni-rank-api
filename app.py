@@ -6,9 +6,11 @@ from selenium.webdriver.chrome.service import Service
 from webdriver_manager.chrome import ChromeDriverManager
 import time
 import logging
+import json
 
 app = Flask(__name__)
 logging.basicConfig(level=logging.INFO)
+
 
 def get_blog_rank(keyword: str, target_blog: str):
     """네이버 블로그 탭에서 target_blog가 몇 위에 노출되는지 반환합니다."""
@@ -16,6 +18,8 @@ def get_blog_rank(keyword: str, target_blog: str):
     options.add_argument("--headless")
     options.add_argument("--no-sandbox")
     options.add_argument("--disable-dev-shm-usage")
+    # ▶ Render 컨테이너에 설치된 Chromium 위치 지정
+    options.binary_location = "/usr/bin/chromium-browser"
 
     driver = webdriver.Chrome(
         service=Service(ChromeDriverManager().install()),
@@ -67,9 +71,17 @@ def rank():
     app.logger.info("RAW body >> %s", request.data)
     app.logger.info("Content-Type >> %s", request.content_type)
 
-    data = request.get_json(force=True)
-    if not data:
-        return jsonify({"error": "Invalid JSON"}), 400
+    # 제어문자 제거 후 JSON 파싱
+    cleaned = (
+        request.data.decode("utf-8")
+        .replace("\u200b", "")  # zero‑width space
+        .replace("\ufeff", "")  # BOM
+        .strip()
+    )
+    try:
+        data = json.loads(cleaned)
+    except json.JSONDecodeError as e:
+        return jsonify({"error": f"Invalid JSON: {e}"}), 400
 
     keyword = data.get("keyword")
     blog_name = data.get("blog_name")
