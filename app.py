@@ -1,12 +1,5 @@
 from flask import Flask, request, jsonify
 from flask_cors import CORS
-from selenium import webdriver
-from selenium.webdriver.common.by import By
-from selenium.webdriver.common.keys import Keys
-from selenium.webdriver.chrome.service import Service
-from webdriver_manager.chrome import ChromeDriverManager
-from webdriver_manager.core.utils import ChromeType
-import time
 import logging
 import json
 
@@ -15,66 +8,12 @@ CORS(app)  # 모든 도메인에서의 요청 허용
 logging.basicConfig(level=logging.INFO)
 
 def get_blog_rank(keyword: str, target_blog: str):
-    """네이버 블로그 탭에서 target_blog가 몇 위에 노출되는지 반환합니다."""
-    options = webdriver.ChromeOptions()
-    options.add_argument("--headless")
-    options.add_argument("--no-sandbox")
-    options.add_argument("--disable-dev-shm-usage")
+    """임시로 고정된 더미 데이터를 반환합니다."""
+    # 로그만 찍고 크롤링 시도 없이 더미 데이터 반환
+    app.logger.info(f"키워드: {keyword}, 블로그: {target_blog} - 크롤링 비활성화 상태")
 
-    try:
-        driver = webdriver.Chrome(
-            service=Service(ChromeDriverManager().install()),
-            options=options,
-        )
-        app.logger.info("Chrome 드라이버 초기화 성공")
-    except Exception as e:
-        app.logger.error("Chrome 드라이버 초기화 실패: %s", e)
-        app.logger.info("크롤링 실패, 더미 데이터 반환")
-        return 5  # 테스트용 더미 값
-
-    try:
-        app.logger.info("네이버 페이지 접속 시도")
-        driver.get("https://www.naver.com")
-        time.sleep(3)
-
-        app.logger.info("검색어 입력: %s", keyword)
-        search = driver.find_element(By.ID, "query")
-        search.send_keys(keyword)
-        search.send_keys(Keys.RETURN)
-        time.sleep(4)
-
-        try:
-            app.logger.info("블로그 탭 클릭 시도")
-            blog_tab = driver.find_element(By.LINK_TEXT, "블로그")
-            blog_tab.click()
-            time.sleep(4)
-        except Exception as e:
-            app.logger.info("블로그 탭 클릭 실패, URL 직접 접근: %s", e)
-            driver.get(f"https://search.naver.com/search.naver?where=blog&query={keyword}")
-            time.sleep(4)
-
-        app.logger.info("블로그 목록 스캔 시작")
-        names = driver.find_elements(By.CSS_SELECTOR, ".user_info > a.name")
-        app.logger.info("찾은 블로그 수: %d", len(names))
-
-        keywords_to_match = [w for w in target_blog.replace("-", " ").replace("'", "").split() if len(w) > 1]
-        app.logger.info("검색할 키워드: %s", keywords_to_match)
-
-        for idx, elem in enumerate(names, 1):
-            name_text = elem.text.strip()
-            app.logger.info("블로그 %d: %s", idx, name_text)
-            if any(k in name_text for k in keywords_to_match):
-                app.logger.info("일치하는 블로그 발견! 순위: %d", idx)
-                return idx
-
-        app.logger.info("일치하는 블로그를 찾지 못함")
-        return None
-    except Exception as e:
-        app.logger.exception("크롤링 중 오류", exc_info=e)
-        return "크롤링 오류: " + str(e)
-    finally:
-        driver.quit()
-        app.logger.info("드라이버 종료")
+    # 테스트용 더미 데이터
+    return 5  # 고정된 순위 값 반환
 
 @app.route("/rank", methods=["POST", "GET"])
 def rank():
@@ -106,9 +45,9 @@ def rank():
     if not keyword or not blog_name:
         return jsonify({"error": "keyword와 blog_name은 필수입니다."}), 400
 
-    app.logger.info("크롤링 시작...")
+    app.logger.info("크롤링 대신 더미 데이터 반환")
     result = get_blog_rank(keyword, blog_name)
-    app.logger.info("크롤링 완료, 결과: %s", result)
+    app.logger.info("결과: %s", result)
 
     return jsonify({"rank": result})
 
@@ -121,7 +60,7 @@ def test():
         data = request.get_json(force=True)
         return jsonify({
             "received": data,
-            "rank": 5
+            "rank": 5  # 테스트용 고정 값
         })
     except Exception as e:
         return jsonify({"error": str(e)}), 500
